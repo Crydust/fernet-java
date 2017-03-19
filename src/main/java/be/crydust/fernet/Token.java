@@ -8,7 +8,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -17,12 +16,11 @@ import java.security.SecureRandom;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Objects;
 
 public class Token {
 
     private static final byte VERSION = (byte) 0x80;
-    private static final long TTL_NONE = Long.MIN_VALUE;
+    private static final long TTL_NONE = -1L;
     private static final int HMAC_LENGTH = 32;
     private static final int VERSION_LENGTH = 1;
     private static final int TIMESTAMP_LENGTH = 8;
@@ -74,9 +72,6 @@ public class Token {
     }
 
     public static Token decrypt(ZonedDateTime now, String base64urlEncodedToken, Key key, long ttl) {
-        Objects.requireNonNull(now);
-        Objects.requireNonNull(base64urlEncodedToken);
-        Objects.requireNonNull(key);
         if (ttl != TTL_NONE && ttl < 1L) {
             throw new IllegalArgumentException("time-to-live must be positive");
         }
@@ -105,7 +100,8 @@ public class Token {
 
         // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp is not too far in the past.
         final long nowEpoch = now.toEpochSecond();
-        final long timestamp = ByteBuffer.wrap(tokenBytes, VERSION_LENGTH, TIMESTAMP_LENGTH).getLong();
+        final byte[] timestampBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH);
+        final long timestamp = BitPacking.unpackLongBigendian(timestampBytes);
         if (ttl != TTL_NONE) {
             final long goodTill = timestamp + ttl;
             if (goodTill <= nowEpoch) {
@@ -150,22 +146,15 @@ public class Token {
         return new Token(now, iv, message, key, base64urlEncodedToken);
     }
 
+
     public byte[] getMessage() {
         return Arrays.copyOf(message, message.length);
     }
 
-    private static String generate(ZonedDateTime now, IvParameterSpec iv, byte[] message, Key key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
-
-        Objects.requireNonNull(now);
-        Objects.requireNonNull(iv);
-        if (iv.getIV().length != IV_LENGTH) {
-            throw new RuntimeException("bad iv length " + iv.getIV().length);
-        }
-        Objects.requireNonNull(message);
-        Objects.requireNonNull(key);
+    private static String generate(ZonedDateTime now, IvParameterSpec iv, byte[] message, Key key) {
 
         // 1. Record the current time for the timestamp field.
-        final byte[] timestamp = ByteBuffer.allocate(TIMESTAMP_LENGTH).putLong(now.toEpochSecond()).array();
+        final byte[] timestamp = BitPacking.packLongBigendian(now.toEpochSecond());
 
         // 2. Choose a unique IV.
         // see constructor
@@ -173,23 +162,42 @@ public class Token {
         // 3. Construct the ciphertext:
         // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
         // ii. Encrypt the padded message using AES 128 in CBC mode with the chosen IV and user-supplied encryption-key.
-        final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, key.getEncryptionKey(), iv);
-        final byte[] ciphertext = cipher.doFinal(message);
+        final byte[] ciphertext;
+        try {
+            final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, key.getEncryptionKey(), iv);
+            ciphertext = cipher.doFinal(message);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
+            throw new RuntimeException(e);
+        }
 
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream(1 + TIMESTAMP_LENGTH + IV_LENGTH + ciphertext.length + HMAC_LENGTH);
-        bos.write(VERSION);
-        bos.write(timestamp);
-        bos.write(iv.getIV());
-        bos.write(ciphertext);
+        final ByteArrayOutputStream bos;
+        try {
+            bos = new ByteArrayOutputStream();
+            bos.write(VERSION);
+            bos.write(timestamp);
+            bos.write(iv.getIV());
+            bos.write(ciphertext);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-        // 4. Compute the HMAC field as described above using the user-supplied signing-key.
-        final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
-        sha256_HMAC.init(key.getSigningKey());
-        final byte[] hmac = sha256_HMAC.doFinal(bos.toByteArray());
+        final byte[] hmac;
+        try {
+            // 4. Compute the HMAC field as described above using the user-supplied signing-key.
+            final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
+            sha256_HMAC.init(key.getSigningKey());
+            hmac = sha256_HMAC.doFinal(bos.toByteArray());
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
 
-        // 5. Concatenate all fields together in the format above.
-        bos.write(hmac);
+        try {
+            // 5. Concatenate all fields together in the format above.
+            bos.write(hmac);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         // 6. base64url encode the entire token.
         return Base64.getUrlEncoder().encodeToString(bos.toByteArray());
@@ -198,11 +206,7 @@ public class Token {
     @Override
     public String toString() {
         if (base64urlEncodedToken == null) {
-            try {
-                base64urlEncodedToken = generate(now, iv, message, key);
-            } catch (IOException | NoSuchAlgorithmException | InvalidKeyException | NoSuchPaddingException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
-                throw new RuntimeException(e);
-            }
+            base64urlEncodedToken = generate(now, iv, message, key);
         }
         return base64urlEncodedToken;
     }
