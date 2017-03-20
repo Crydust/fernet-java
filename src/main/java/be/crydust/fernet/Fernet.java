@@ -1,23 +1,15 @@
 package be.crydust.fernet;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import java.security.*;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 
-public class Token {
+public class Fernet {
 
     private static final byte VERSION = (byte) 0x80;
     private static final long TTL_NONE = -1L;
@@ -31,26 +23,18 @@ public class Token {
     private static final int BLOCK_SIZE = 16;
     private static final int MAX_CLOCK_SKEW = 60;
 
-    private final ZonedDateTime now;
-    private final IvParameterSpec iv;
-    private final byte[] message;
     private final Key key;
-    private String base64urlEncodedToken = null;
 
-    public Token(byte[] message, Key key) {
-        this(ZonedDateTime.now(), generateIV(), message, key);
+    public Fernet(byte[] key) {
+        this.key = new Key(key);
     }
 
-    public Token(ZonedDateTime now, IvParameterSpec iv, byte[] message, Key key) {
-        this(now, iv, message, key, null);
+    public Fernet(String key) {
+        this.key = new Key(key);
     }
 
-    private Token(ZonedDateTime now, IvParameterSpec iv, byte[] message, Key key, String base64urlEncodedToken) {
-        this.now = now;
-        this.iv = iv;
-        this.message = message;
+    public Fernet(Key key) {
         this.key = key;
-        this.base64urlEncodedToken = base64urlEncodedToken;
     }
 
     private static IvParameterSpec generateIV() {
@@ -63,15 +47,59 @@ public class Token {
         return new IvParameterSpec(ivBytes);
     }
 
-    public static Token decrypt(String base64urlEncodedToken, Key key) {
-        return decrypt(ZonedDateTime.now(), base64urlEncodedToken, key, TTL_NONE);
+    private static String encryptFromParts(byte[] message, IvParameterSpec iv, ZonedDateTime now, Key key) {
+
+        // 1. Record the current time for the timestamp field.
+        final byte[] timestamp = BitPacking.packLongBigendian(now.toEpochSecond());
+
+        // 2. Choose a unique IV.
+        // see constructor
+
+        // 3. Construct the ciphertext:
+        // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
+        // ii. Encrypt the padded message using AES 128 in CBC mode with the chosen IV and user-supplied encryption-key.
+        final byte[] ciphertext;
+        try {
+            final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, key.getEncryptionKey(), iv);
+            ciphertext = cipher.doFinal(message);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
+            throw new RuntimeException(e);
+        }
+
+        final ByteArrayOutputStream bos;
+        try {
+            bos = new ByteArrayOutputStream();
+            bos.write(VERSION);
+            bos.write(timestamp);
+            bos.write(iv.getIV());
+            bos.write(ciphertext);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        final byte[] hmac;
+        try {
+            // 4. Compute the HMAC field as described above using the user-supplied signing-key.
+            final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
+            sha256_HMAC.init(key.getSigningKey());
+            hmac = sha256_HMAC.doFinal(bos.toByteArray());
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            // 5. Concatenate all fields together in the format above.
+            bos.write(hmac);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // 6. base64url encode the entire token.
+        return Base64.getUrlEncoder().encodeToString(bos.toByteArray());
     }
 
-    public static Token decrypt(String base64urlEncodedToken, Key key, long ttl) {
-        return decrypt(ZonedDateTime.now(), base64urlEncodedToken, key, ttl);
-    }
-
-    public static Token decrypt(ZonedDateTime now, String base64urlEncodedToken, Key key, long ttl) {
+    private static byte[] decrypt(String base64urlEncodedToken, long ttl, ZonedDateTime now, Key key) {
         if (ttl != TTL_NONE && ttl < 1L) {
             throw new IllegalArgumentException("time-to-live must be positive");
         }
@@ -143,71 +171,37 @@ public class Token {
             throw new RuntimeException(e);
         }
 
-        return new Token(now, iv, message, key, base64urlEncodedToken);
+        return message;
     }
 
-
-    public byte[] getMessage() {
-        return Arrays.copyOf(message, message.length);
+    public static String generateKey() {
+        return Key.generate().toString();
     }
 
-    private static String generate(ZonedDateTime now, IvParameterSpec iv, byte[] message, Key key) {
-
-        // 1. Record the current time for the timestamp field.
-        final byte[] timestamp = BitPacking.packLongBigendian(now.toEpochSecond());
-
-        // 2. Choose a unique IV.
-        // see constructor
-
-        // 3. Construct the ciphertext:
-        // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
-        // ii. Encrypt the padded message using AES 128 in CBC mode with the chosen IV and user-supplied encryption-key.
-        final byte[] ciphertext;
-        try {
-            final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, key.getEncryptionKey(), iv);
-            ciphertext = cipher.doFinal(message);
-        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
-            throw new RuntimeException(e);
-        }
-
-        final ByteArrayOutputStream bos;
-        try {
-            bos = new ByteArrayOutputStream();
-            bos.write(VERSION);
-            bos.write(timestamp);
-            bos.write(iv.getIV());
-            bos.write(ciphertext);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        final byte[] hmac;
-        try {
-            // 4. Compute the HMAC field as described above using the user-supplied signing-key.
-            final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
-            sha256_HMAC.init(key.getSigningKey());
-            hmac = sha256_HMAC.doFinal(bos.toByteArray());
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
-        }
-
-        try {
-            // 5. Concatenate all fields together in the format above.
-            bos.write(hmac);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // 6. base64url encode the entire token.
-        return Base64.getUrlEncoder().encodeToString(bos.toByteArray());
+    public String encrypt(byte[] message) {
+        return this.encrypt(message, generateIV());
+    }
+    public String encrypt(byte[] message, ZonedDateTime now) {
+        return this.encrypt(message, generateIV(), now);
     }
 
-    @Override
-    public String toString() {
-        if (base64urlEncodedToken == null) {
-            base64urlEncodedToken = generate(now, iv, message, key);
-        }
-        return base64urlEncodedToken;
+    public String encrypt(byte[] message, IvParameterSpec iv) {
+        return this.encrypt(message, iv, ZonedDateTime.now());
+    }
+
+    public String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now) {
+        return encryptFromParts(message, iv, now, this.key);
+    }
+
+    public byte[] decrypt(String token) {
+        return this.decrypt(token, TTL_NONE);
+    }
+
+    public byte[] decrypt(String token, long ttl) {
+        return this.decrypt(token, ttl, ZonedDateTime.now());
+    }
+
+    public byte[] decrypt(String token, long ttl, ZonedDateTime now) {
+        return decrypt(token, ttl, now, this.key);
     }
 }

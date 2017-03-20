@@ -2,6 +2,8 @@ package be.crydust.fernet;
 
 import org.junit.Test;
 
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -15,9 +17,21 @@ public class FernetTest {
     @Test
     public void can_verify_tokens_it_generates() throws Exception {
         Stream.of("harold@heroku.com", "12345", "weird!@#$%^&*()chars", "more weird chars §§§§").forEach(plain -> {
-            String token = new Token(plain.getBytes(UTF_8), new Key(secret)).toString();
-            String message = new String(Token.decrypt(token, new Key(secret)).getMessage(), UTF_8);
+            String token = new Fernet(secret).encrypt(plain.getBytes(UTF_8));
+            String message = new String(new Fernet(secret).decrypt(token), UTF_8);
             assertThat(message, is(plain));
         });
+    }
+
+    @Test(expected = Exception.class)
+    public void fails_with_a_bad_secret() throws Exception {
+        String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
+        new Fernet(bad_secret).decrypt(token);
+    }
+
+    @Test(expected = Exception.class)
+    public void fails_if_the_token_is_too_old() {
+        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), ZonedDateTime.now().minus(61, ChronoUnit.SECONDS));
+        new Fernet(secret).decrypt(token, 60);
     }
 }

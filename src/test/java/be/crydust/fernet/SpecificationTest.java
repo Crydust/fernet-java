@@ -37,9 +37,7 @@ public class SpecificationTest {
             final String srcString = object.getString("src");
             final byte[] message = srcString.getBytes(StandardCharsets.UTF_8);
             final String secretString = object.getString("secret");
-            final Key key = new Key(secretString);
-            final Token token = new Token(now, iv, message, key);
-            final String actualToken = token.toString();
+            final String actualToken = new Fernet(secretString).encrypt(message, iv, now);
             assertThat(actualToken, is(expectedToken));
         }
     }
@@ -54,9 +52,8 @@ public class SpecificationTest {
             final long ttl = object.getLong("ttl_sec");
             final String expectedMessage = object.getString("src");
             final String secretString = object.getString("secret");
-            final Key key = new Key(secretString);
-            final Token decryptedToken = Token.decrypt(now, actualToken, key, ttl);
-            final String actualMessage = new String(decryptedToken.getMessage(), StandardCharsets.UTF_8);
+            final byte[] decryptedBytes = new Fernet(secretString).decrypt(actualToken, ttl, now);
+            final String actualMessage = new String(decryptedBytes, StandardCharsets.UTF_8);
             assertThat(actualMessage, is(expectedMessage));
         }
     }
@@ -75,9 +72,8 @@ public class SpecificationTest {
                 final ZonedDateTime now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME);
                 final long ttl = object.getLong("ttl_sec");
                 final String secretString = object.getString("secret");
-                final Key key = new Key(secretString);
                 try {
-                    final Token decryptedToken = Token.decrypt(now, actualToken, key, ttl);
+                    final byte[] decryptedBytes = new Fernet(secretString).decrypt(actualToken, ttl, now);
                     fail("ERROR exception not thrown");
                 } catch (Exception e) {
                     final String actualMessage = e.getMessage();
