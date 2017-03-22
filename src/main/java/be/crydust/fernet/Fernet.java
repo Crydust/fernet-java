@@ -2,15 +2,18 @@ package be.crydust.fernet;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.security.*;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 
-public class Fernet {
+public class Fernet implements Serializable {
 
     private static final byte VERSION = (byte) 0x80;
     private static final int HMAC_LENGTH = 32;
@@ -24,14 +27,6 @@ public class Fernet {
     private static final int MAX_CLOCK_SKEW = 60;
 
     private final Key key;
-
-    public Fernet(byte[] key) {
-        this.key = new Key(key);
-    }
-
-    public Fernet(String key) {
-        this.key = new Key(key);
-    }
 
     public Fernet(Key key) {
         this.key = key;
@@ -47,10 +42,10 @@ public class Fernet {
         return new IvParameterSpec(ivBytes);
     }
 
-    private static String encryptFromParts(byte[] message, IvParameterSpec iv, ZonedDateTime now, Key key) {
+    private static String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now, Key key) {
 
         // 1. Record the current time for the timestamp field.
-        final byte[] timestamp = BitPacking.packLongBigendian(now.toEpochSecond());
+        final byte[] timestamp = packLongBigendian(now.toEpochSecond());
 
         // 2. Choose a unique IV.
         // see constructor
@@ -129,7 +124,7 @@ public class Fernet {
         // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp is not too far in the past.
         final long nowEpoch = now.toEpochSecond();
         final byte[] timestampBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH);
-        final long timestamp = BitPacking.unpackLongBigendian(timestampBytes);
+        final long timestamp = unpackLongBigendian(timestampBytes);
         if (ttl != null) {
             final long goodTill = timestamp + ttl.getSeconds();
             if (goodTill <= nowEpoch) {
@@ -174,43 +169,121 @@ public class Fernet {
         return message;
     }
 
-    public static String generateKey() {
-        return Key.generate().toString();
+    public static Key generateKey() {
+        return Key.generate();
+    }
+
+    static byte[] packLongBigendian(long value) {
+        return ByteBuffer.allocate(8).putLong(value).array();
+    }
+
+    static long unpackLongBigendian(byte[] bytes) {
+        if (bytes.length != 8) {
+            throw new IllegalArgumentException("Expected an array of 8 bytes, not " + bytes.length);
+        }
+        return ByteBuffer.wrap(bytes).getLong();
     }
 
     public String encrypt(byte[] message) {
-        return this.encrypt(message, generateIV());
+        return this.encrypt(message, generateIV(), ZonedDateTime.now());
     }
 
     public String encrypt(byte[] message, ZonedDateTime now) {
         return this.encrypt(message, generateIV(), now);
     }
 
-    public String encrypt(byte[] message, IvParameterSpec iv) {
-        return this.encrypt(message, iv, ZonedDateTime.now());
-    }
-
-    public String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now) {
-        return encryptFromParts(message, iv, now, this.key);
+    String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now) {
+        return encrypt(message, iv, now, this.key);
     }
 
     public byte[] decrypt(String token) {
         return this.decrypt(token, null, ZonedDateTime.now());
     }
 
-    public byte[] decrypt(String token, long ttl) {
-        return this.decrypt(token, ttl, ZonedDateTime.now());
-    }
-
     public byte[] decrypt(String token, Duration ttl) {
         return this.decrypt(token, ttl, ZonedDateTime.now());
     }
 
-    public byte[] decrypt(String token, long ttl, ZonedDateTime now) {
-        return this.decrypt(token, Duration.ofSeconds(ttl), now);
+    byte[] decrypt(String token, Duration ttl, ZonedDateTime now) {
+        return decrypt(token, ttl, now, this.key);
     }
 
-    public byte[] decrypt(String token, Duration ttl, ZonedDateTime now) {
-        return decrypt(token, ttl, now, this.key);
+    /**
+     * A fernet key is the base64url encoding of the following fields:
+     * Signing-key, Encryption-key
+     * <ul>
+     * <li>Signing-key, 128 bits</li>
+     * <li>Encryption-key, 128 bits</li>
+     * </ul>
+     */
+    public static class Key implements Serializable {
+        private static final String SIGNING_KEY_ALGORITHM = "HmacSHA256";
+        private static final String ENCRYPTION_KEY_ALGORITHM = "AES";
+
+        private final SecretKey signingKey;
+        private final SecretKey encryptionKey;
+        private volatile String base64urlEncodedSecret = null;
+
+        public Key(String base64urlEncodedSecret) {
+            this(Base64.getUrlDecoder().decode(base64urlEncodedSecret));
+            this.base64urlEncodedSecret = base64urlEncodedSecret;
+        }
+
+        public Key(byte[] secretBytes) {
+            this(Arrays.copyOfRange(secretBytes, 0, 16),
+                    Arrays.copyOfRange(secretBytes, 16, 32));
+        }
+
+        private Key(byte[] signingKeyBytes, byte[] encryptionKeyBytes) {
+            this(new SecretKeySpec(signingKeyBytes, SIGNING_KEY_ALGORITHM),
+                    new SecretKeySpec(encryptionKeyBytes, ENCRYPTION_KEY_ALGORITHM));
+        }
+
+        private Key(SecretKey signingKey, SecretKey encryptionKey) {
+            assert SIGNING_KEY_ALGORITHM.equals(signingKey.getAlgorithm());
+            assert signingKey.getEncoded().length == 16;
+            assert ENCRYPTION_KEY_ALGORITHM.equals(encryptionKey.getAlgorithm());
+            assert encryptionKey.getEncoded().length == 16;
+
+            this.signingKey = signingKey;
+            this.encryptionKey = encryptionKey;
+        }
+
+        private static Key generate() {
+            final byte[] bytes = new byte[32];
+            try {
+                SecureRandom.getInstanceStrong().nextBytes(bytes);
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
+            return new Key(bytes);
+        }
+
+        private SecretKey getSigningKey() {
+            return signingKey;
+        }
+
+        private SecretKey getEncryptionKey() {
+            return encryptionKey;
+        }
+
+        @Override
+        public String toString() {
+            if (base64urlEncodedSecret == null) {
+                synchronized (this) {
+                    if (base64urlEncodedSecret == null) {
+                        try {
+                            final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                            bos.write(signingKey.getEncoded());
+                            bos.write(encryptionKey.getEncoded());
+                            base64urlEncodedSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }
+            return base64urlEncodedSecret;
+        }
     }
 }
