@@ -5,6 +5,7 @@ import javax.crypto.spec.IvParameterSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.*;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
@@ -12,7 +13,6 @@ import java.util.Base64;
 public class Fernet {
 
     private static final byte VERSION = (byte) 0x80;
-    private static final long TTL_NONE = -1L;
     private static final int HMAC_LENGTH = 32;
     private static final int VERSION_LENGTH = 1;
     private static final int TIMESTAMP_LENGTH = 8;
@@ -99,8 +99,8 @@ public class Fernet {
         return Base64.getUrlEncoder().encodeToString(bos.toByteArray());
     }
 
-    private static byte[] decrypt(String base64urlEncodedToken, long ttl, ZonedDateTime now, Key key) {
-        if (ttl != TTL_NONE && ttl < 1L) {
+    private static byte[] decrypt(String base64urlEncodedToken, Duration ttl, ZonedDateTime now, Key key) {
+        if (ttl != null && ttl.isNegative()) {
             throw new IllegalArgumentException("time-to-live must be positive");
         }
 
@@ -130,8 +130,8 @@ public class Fernet {
         final long nowEpoch = now.toEpochSecond();
         final byte[] timestampBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH);
         final long timestamp = BitPacking.unpackLongBigendian(timestampBytes);
-        if (ttl != TTL_NONE) {
-            final long goodTill = timestamp + ttl;
+        if (ttl != null) {
+            final long goodTill = timestamp + ttl.getSeconds();
             if (goodTill <= nowEpoch) {
                 throw new RuntimeException("expired TTL");
             }
@@ -181,6 +181,7 @@ public class Fernet {
     public String encrypt(byte[] message) {
         return this.encrypt(message, generateIV());
     }
+
     public String encrypt(byte[] message, ZonedDateTime now) {
         return this.encrypt(message, generateIV(), now);
     }
@@ -194,14 +195,22 @@ public class Fernet {
     }
 
     public byte[] decrypt(String token) {
-        return this.decrypt(token, TTL_NONE);
+        return this.decrypt(token, null, ZonedDateTime.now());
     }
 
     public byte[] decrypt(String token, long ttl) {
         return this.decrypt(token, ttl, ZonedDateTime.now());
     }
 
+    public byte[] decrypt(String token, Duration ttl) {
+        return this.decrypt(token, ttl, ZonedDateTime.now());
+    }
+
     public byte[] decrypt(String token, long ttl, ZonedDateTime now) {
+        return this.decrypt(token, Duration.ofSeconds(ttl), now);
+    }
+
+    public byte[] decrypt(String token, Duration ttl, ZonedDateTime now) {
         return decrypt(token, ttl, now, this.key);
     }
 }
