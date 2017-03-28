@@ -28,6 +28,14 @@ public class Fernet implements Serializable {
 
     private final Key key;
 
+    public Fernet(String base64urlEncodedSecret) {
+        this(new Key(base64urlEncodedSecret));
+    }
+
+    public Fernet(byte[] secretBytes) {
+        this(new Key(secretBytes));
+    }
+
     public Fernet(Key key) {
         this.key = key;
     }
