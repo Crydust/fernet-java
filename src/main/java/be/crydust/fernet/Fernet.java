@@ -277,21 +277,23 @@ public class Fernet implements Serializable {
 
         @Override
         public String toString() {
-            if (base64urlEncodedSecret == null) {
+            String localSecret = this.base64urlEncodedSecret;
+            if (localSecret == null) {
                 synchronized (this) {
-                    if (base64urlEncodedSecret == null) {
+                    localSecret = this.base64urlEncodedSecret;
+                    if (localSecret == null) {
                         try {
                             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
                             bos.write(signingKey.getEncoded());
                             bos.write(encryptionKey.getEncoded());
-                            base64urlEncodedSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
+                            this.base64urlEncodedSecret = localSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
                     }
                 }
             }
-            return base64urlEncodedSecret;
+            return localSecret;
         }
     }
 }
