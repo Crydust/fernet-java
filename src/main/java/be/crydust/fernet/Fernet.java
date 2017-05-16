@@ -28,6 +28,10 @@ public class Fernet implements Serializable {
 
     private final Key key;
 
+    public Fernet() {
+        this(generateKey());
+    }
+
     public Fernet(String base64urlEncodedSecret) {
         this(new Key(base64urlEncodedSecret));
     }
@@ -36,7 +40,7 @@ public class Fernet implements Serializable {
         this(new Key(secretBytes));
     }
 
-    public Fernet(Key key) {
+    private Fernet(Key key) {
         this.key = key;
     }
 
@@ -216,6 +220,11 @@ public class Fernet implements Serializable {
         return decrypt(token, ttl, now, this.key);
     }
 
+    @Override
+    public String toString() {
+        return key.toString();
+    }
+
     /**
      * A fernet key is the base64url encoding of the following fields:
      * Signing-key, Encryption-key
@@ -224,7 +233,7 @@ public class Fernet implements Serializable {
      * <li>Encryption-key, 128 bits</li>
      * </ul>
      */
-    public static class Key implements Serializable {
+    private static class Key implements Serializable {
         private static final String SIGNING_KEY_ALGORITHM = "HmacSHA256";
         private static final String ENCRYPTION_KEY_ALGORITHM = "AES";
 
@@ -232,12 +241,12 @@ public class Fernet implements Serializable {
         private final SecretKey encryptionKey;
         private volatile String base64urlEncodedSecret = null;
 
-        public Key(String base64urlEncodedSecret) {
+        Key(String base64urlEncodedSecret) {
             this(Base64.getUrlDecoder().decode(base64urlEncodedSecret));
             this.base64urlEncodedSecret = base64urlEncodedSecret;
         }
 
-        public Key(byte[] secretBytes) {
+        Key(byte[] secretBytes) {
             this(Arrays.copyOfRange(secretBytes, 0, 16),
                     Arrays.copyOfRange(secretBytes, 16, 32));
         }

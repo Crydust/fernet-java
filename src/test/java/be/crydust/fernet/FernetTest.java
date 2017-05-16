@@ -1,6 +1,5 @@
 package be.crydust.fernet;
 
-import be.crydust.fernet.Fernet.Key;
 import org.junit.Test;
 
 import java.time.Duration;
@@ -13,8 +12,8 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class FernetTest {
-    private String secret = "JrdICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
-    private String bad_secret = "badICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
+    private final String secret = "JrdICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
+    private final String bad_secret = "badICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
 
     @Test
     public void can_verify_tokens_it_generates() throws Exception {
@@ -28,7 +27,7 @@ public class FernetTest {
     @Test(expected = Exception.class)
     public void fails_with_a_bad_secret() throws Exception {
         String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
-        new Fernet(new Key(bad_secret)).decrypt(token);
+        new Fernet(bad_secret).decrypt(token);
     }
 
     @Test(expected = Exception.class)

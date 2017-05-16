@@ -1,6 +1,5 @@
 package be.crydust.fernet;
 
-import be.crydust.fernet.Fernet.Key;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
