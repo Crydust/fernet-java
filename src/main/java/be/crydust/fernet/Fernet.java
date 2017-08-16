@@ -1,17 +1,30 @@
 package be.crydust.fernet;
 
-import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import static javax.crypto.Cipher.DECRYPT_MODE;
+import static javax.crypto.Cipher.ENCRYPT_MODE;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.security.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class Fernet implements Serializable {
 
@@ -29,7 +42,7 @@ public class Fernet implements Serializable {
     private final Key key;
 
     public Fernet() {
-        this(generateKey());
+        this(Key.generate());
     }
 
     public Fernet(String base64urlEncodedSecret) {
@@ -49,7 +62,7 @@ public class Fernet implements Serializable {
         try {
             SecureRandom.getInstanceStrong().nextBytes(ivBytes);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
         return new IvParameterSpec(ivBytes);
     }
@@ -60,7 +73,7 @@ public class Fernet implements Serializable {
         final byte[] timestamp = packLongBigendian(now.toEpochSecond());
 
         // 2. Choose a unique IV.
-        // see constructor
+        // see generateIV
 
         // 3. Construct the ciphertext:
         // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
@@ -68,21 +81,20 @@ public class Fernet implements Serializable {
         final byte[] ciphertext;
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, key.getEncryptionKey(), iv);
+            cipher.init(ENCRYPT_MODE, key.getEncryptionKey(), iv);
             ciphertext = cipher.doFinal(message);
         } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
-        final ByteArrayOutputStream bos;
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try {
-            bos = new ByteArrayOutputStream();
             bos.write(VERSION);
             bos.write(timestamp);
             bos.write(iv.getIV());
             bos.write(ciphertext);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
         final byte[] hmac;
@@ -92,14 +104,14 @@ public class Fernet implements Serializable {
             sha256_HMAC.init(key.getSigningKey());
             hmac = sha256_HMAC.doFinal(bos.toByteArray());
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
         try {
             // 5. Concatenate all fields together in the format above.
             bos.write(hmac);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
         // 6. base64url encode the entire token.
@@ -116,21 +128,21 @@ public class Fernet implements Serializable {
         try {
             tokenBytes = Base64.getUrlDecoder().decode(base64urlEncodedToken);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("invalid base64", e);
+            throw new FernetException("invalid base64", e);
         }
 
         // 2. Ensure the first byte of the token is 0x80.
         final byte version = tokenBytes[0];
         if (version != VERSION) {
-            throw new RuntimeException("Unknown version " + version);
+            throw new FernetException("Unknown version " + version);
         }
 
         if (tokenBytes.length < MIN_TOKEN_LENGTH) {
-            throw new RuntimeException("too short");
+            throw new FernetException("too short");
         }
 
         if ((tokenBytes.length - MIN_TOKEN_LENGTH) % BLOCK_SIZE != 0) {
-            throw new RuntimeException("payload size not multiple of block size");
+            throw new FernetException("payload size not multiple of block size");
         }
 
         // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp is not too far in the past.
@@ -140,11 +152,11 @@ public class Fernet implements Serializable {
         if (ttl != null) {
             final long goodTill = timestamp + ttl.getSeconds();
             if (goodTill <= nowEpoch) {
-                throw new RuntimeException("expired TTL");
+                throw new FernetException("expired TTL");
             }
         }
         if (timestamp >= nowEpoch + MAX_CLOCK_SKEW) {
-            throw new RuntimeException("far-future TS (unacceptable clock skew)");
+            throw new FernetException("far-future TS (unacceptable clock skew)");
         }
 
         try {
@@ -156,10 +168,10 @@ public class Fernet implements Serializable {
             final byte[] recomputedHmac = sha256_HMAC.doFinal();
             // 5. Ensure the recomputed HMAC matches the HMAC field stored in the token, using a constant-time comparison function.
             if (!MessageDigest.isEqual(recomputedHmac, hmac)) {
-                throw new RuntimeException("incorrect mac");
+                throw new FernetException("incorrect mac");
             }
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
         final byte[] ivBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH + TIMESTAMP_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH);
@@ -170,19 +182,15 @@ public class Fernet implements Serializable {
         byte[] message;
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, key.getEncryptionKey(), iv);
+            cipher.init(DECRYPT_MODE, key.getEncryptionKey(), iv);
             message = cipher.doFinal(tokenBytes, VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH, tokenBytes.length - (VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH) - HMAC_LENGTH);
         } catch (BadPaddingException e) {
-            throw new RuntimeException("payload padding error", e);
+            throw new FernetException("payload padding error", e);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException e) {
-            throw new RuntimeException(e);
+            throw new FernetException(e);
         }
 
         return message;
-    }
-
-    public static Key generateKey() {
-        return Key.generate();
     }
 
     static byte[] packLongBigendian(long value) {
@@ -271,7 +279,7 @@ public class Fernet implements Serializable {
             try {
                 SecureRandom.getInstanceStrong().nextBytes(bytes);
             } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException(e);
+                throw new FernetException(e);
             }
             return new Key(bytes);
         }
@@ -297,7 +305,7 @@ public class Fernet implements Serializable {
                             bos.write(encryptionKey.getEncoded());
                             this.base64urlEncodedSecret = localSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
                         } catch (IOException e) {
-                            throw new RuntimeException(e);
+                            throw new FernetException(e);
                         }
                     }
                 }

@@ -1,22 +1,27 @@
 package be.crydust.fernet;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.junit.Test;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 
-import javax.crypto.spec.IvParameterSpec;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import javax.crypto.spec.IvParameterSpec;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class SpecificationTest {
+
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void generate() throws Exception {
@@ -73,13 +78,9 @@ public class SpecificationTest {
                 final ZonedDateTime now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME);
                 final long ttl = object.getLong("ttl_sec");
                 final String secretString = object.getString("secret");
-                try {
-                    final byte[] decryptedBytes = new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now);
-                    fail("ERROR exception not thrown");
-                } catch (Exception e) {
-                    final String actualMessage = e.getMessage();
-                    assertThat(actualMessage, is(expectedMessage));
-                }
+                thrown.expect(FernetException.class);
+                thrown.expectMessage(expectedMessage);
+                new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now);
             }
         }
     }
