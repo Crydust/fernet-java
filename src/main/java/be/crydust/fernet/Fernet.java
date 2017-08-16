@@ -1,8 +1,13 @@
 package be.crydust.fernet;
 
-import static javax.crypto.Cipher.DECRYPT_MODE;
-import static javax.crypto.Cipher.ENCRYPT_MODE;
-
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
@@ -17,14 +22,9 @@ import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static javax.crypto.Cipher.DECRYPT_MODE;
+import static javax.crypto.Cipher.ENCRYPT_MODE;
 
 public class Fernet implements Serializable {
 
@@ -37,7 +37,7 @@ public class Fernet implements Serializable {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String ENCRYPTION_ALGORITHM = "AES/CBC/PKCS5Padding";
     private static final int BLOCK_SIZE = 16;
-    private static final int MAX_CLOCK_SKEW = 60;
+    private static final long MAX_CLOCK_SKEW = 60;
 
     private final Key key;
 
@@ -46,7 +46,7 @@ public class Fernet implements Serializable {
     }
 
     public Fernet(String base64urlEncodedSecret) {
-        this(new Key(base64urlEncodedSecret));
+        this(Key.valueOf(base64urlEncodedSecret));
     }
 
     public Fernet(byte[] secretBytes) {
@@ -134,7 +134,7 @@ public class Fernet implements Serializable {
         // 2. Ensure the first byte of the token is 0x80.
         final byte version = tokenBytes[0];
         if (version != VERSION) {
-            throw new FernetException("Unknown version " + version);
+            throw new FernetException("Unknown version " + Integer.toHexString(version & 0xFF));
         }
 
         if (tokenBytes.length < MIN_TOKEN_LENGTH) {
@@ -249,12 +249,28 @@ public class Fernet implements Serializable {
         private final SecretKey encryptionKey;
         private volatile String base64urlEncodedSecret = null;
 
-        Key(String base64urlEncodedSecret) {
-            this(Base64.getUrlDecoder().decode(base64urlEncodedSecret));
-            this.base64urlEncodedSecret = base64urlEncodedSecret;
+        private static Key valueOf(String s) {
+            try {
+                switch (s.length()) {
+                    case 32:
+                        return new Key(s.getBytes(US_ASCII));
+                    case 43:
+                        // falls through
+                    case 44:
+                        try {
+                            return new Key(Base64.getUrlDecoder().decode(s));
+                        } catch (IllegalArgumentException ex) {
+                            return new Key(Base64.getDecoder().decode(s));
+                        }
+                    default:
+                        throw new FernetException("invalid secret");
+                }
+            } catch (ArrayIndexOutOfBoundsException | IllegalArgumentException ex) {
+                throw new FernetException("invalid secret", ex);
+            }
         }
 
-        Key(byte[] secretBytes) {
+        private Key(byte[] secretBytes) {
             this(Arrays.copyOfRange(secretBytes, 0, 16),
                     Arrays.copyOfRange(secretBytes, 16, 32));
         }

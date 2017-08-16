@@ -1,17 +1,19 @@
 package be.crydust.fernet;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
-
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.stream.Stream;
-
+import org.junit.Ignore;
 import org.junit.Test;
 
+import java.util.Base64;
+import java.util.stream.Stream;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.time.Duration.ofSeconds;
+import static java.time.ZonedDateTime.now;
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.assertThat;
+
 public class FernetTest {
+
     private final String secret = "JrdICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
     private final String bad_secret = "badICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
 
@@ -24,15 +26,39 @@ public class FernetTest {
         });
     }
 
-    @Test(expected = Exception.class)
+    @Test(expected = FernetException.class)
     public void fails_with_a_bad_secret() throws Exception {
         String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
         new Fernet(bad_secret).decrypt(token);
     }
 
-    @Test(expected = Exception.class)
+    @Test(expected = FernetException.class)
     public void fails_if_the_token_is_too_old() {
-        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), ZonedDateTime.now().minus(61, ChronoUnit.SECONDS));
-        new Fernet(secret).decrypt(token, Duration.ofSeconds(60L));
+        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), now().minusSeconds(61));
+        new Fernet(secret).decrypt(token, ofSeconds(60L));
     }
+
+    @Test
+    public void can_ignore_TTL_enforcement() {
+        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
+        String message = new String(new Fernet(secret).decrypt(token, null, now().plusSeconds(9999)), UTF_8);
+        assertThat(message, is("harold@heroku.com"));
+    }
+
+    @Test
+    @Ignore("there is no global config")
+    public void can_ignore_TTL_enforcement_via_global_config() {
+    }
+
+    @Test
+    public void does_not_send_the_message_in_plain_text() {
+        final String token = new Fernet(secret).encrypt("password1".getBytes(UTF_8));
+        assertThat(new String(Base64.getUrlDecoder().decode(token), UTF_8), not(containsString("password1")));
+    }
+
+    @Test
+    @Ignore("not implemented")
+    public void allows_overriding_enforce_ttl_on_a_verifier() {
+    }
+
 }
