@@ -39,6 +39,8 @@ public class Fernet implements Serializable {
     private static final int BLOCK_SIZE = 16;
     private static final long MAX_CLOCK_SKEW = 60;
 
+    private static volatile SecureRandom secureRandom = null;
+
     private final Key key;
 
     public Fernet() {
@@ -57,13 +59,26 @@ public class Fernet implements Serializable {
         this.key = key;
     }
 
-    private static IvParameterSpec generateIV() {
-        final byte[] ivBytes = new byte[IV_LENGTH];
+    private static SecureRandom getSecureRandom() {
         try {
-            SecureRandom.getInstanceStrong().nextBytes(ivBytes);
+            SecureRandom localSecureRandom = Fernet.secureRandom;
+            if (localSecureRandom == null) {
+                synchronized (Fernet.class) {
+                    localSecureRandom = Fernet.secureRandom;
+                    if (localSecureRandom == null) {
+                        Fernet.secureRandom = localSecureRandom = SecureRandom.getInstanceStrong();
+                    }
+                }
+            }
+            return localSecureRandom;
         } catch (NoSuchAlgorithmException e) {
             throw new FernetException(e);
         }
+    }
+
+    private static IvParameterSpec generateIV() {
+        final byte[] ivBytes = new byte[IV_LENGTH];
+        getSecureRandom().nextBytes(ivBytes);
         return new IvParameterSpec(ivBytes);
     }
 
@@ -292,11 +307,7 @@ public class Fernet implements Serializable {
 
         private static Key generate() {
             final byte[] bytes = new byte[32];
-            try {
-                SecureRandom.getInstanceStrong().nextBytes(bytes);
-            } catch (NoSuchAlgorithmException e) {
-                throw new FernetException(e);
-            }
+            getSecureRandom().nextBytes(bytes);
             return new Key(bytes);
         }
 
