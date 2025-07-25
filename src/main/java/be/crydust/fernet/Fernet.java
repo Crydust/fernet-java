@@ -39,7 +39,15 @@ public class Fernet implements Serializable {
     private static final int BLOCK_SIZE = 16;
     private static final long MAX_CLOCK_SKEW = 60;
 
-    private static volatile SecureRandom secureRandom = null;
+    private static final SecureRandom SECURE_RANDOM;
+
+    static {
+        try {
+            SECURE_RANDOM = SecureRandom.getInstanceStrong();
+        } catch (NoSuchAlgorithmException e) {
+            throw new FernetException(e);
+        }
+    }
 
     private final Key key;
 
@@ -59,26 +67,9 @@ public class Fernet implements Serializable {
         this.key = key;
     }
 
-    private static SecureRandom getSecureRandom() {
-        try {
-            SecureRandom localSecureRandom = Fernet.secureRandom;
-            if (localSecureRandom == null) {
-                synchronized (Fernet.class) {
-                    localSecureRandom = Fernet.secureRandom;
-                    if (localSecureRandom == null) {
-                        Fernet.secureRandom = localSecureRandom = SecureRandom.getInstanceStrong();
-                    }
-                }
-            }
-            return localSecureRandom;
-        } catch (NoSuchAlgorithmException e) {
-            throw new FernetException(e);
-        }
-    }
-
     private static IvParameterSpec generateIV() {
         final byte[] ivBytes = new byte[IV_LENGTH];
-        getSecureRandom().nextBytes(ivBytes);
+        SECURE_RANDOM.nextBytes(ivBytes);
         return new IvParameterSpec(ivBytes);
     }
 
@@ -91,14 +82,16 @@ public class Fernet implements Serializable {
         // see generateIV
 
         // 3. Construct the ciphertext:
-        // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
+        // i. Pad the message to a multiple of 16 bytes (128 bits) per RFC 5652, section 6.3. This is the same padding
+        // technique used in PKCS #7 v1.5 and all versions of SSL/TLS (cf. RFC 5246, section 6.2.3.2 for TLS 1.2).
         // ii. Encrypt the padded message using AES 128 in CBC mode with the chosen IV and user-supplied encryption-key.
         final byte[] ciphertext;
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
             cipher.init(ENCRYPT_MODE, key.getEncryptionKey(), iv);
             ciphertext = cipher.doFinal(message);
-        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidAlgorithmParameterException
+                 | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
             throw new FernetException(e);
         }
 
@@ -160,9 +153,13 @@ public class Fernet implements Serializable {
             throw new FernetException("payload size not multiple of block size");
         }
 
-        // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp is not too far in the past.
+        // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp
+        // is not too far in the past.
         final long nowEpoch = now.toEpochSecond();
-        final byte[] timestampBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH);
+        final byte[] timestampBytes = Arrays.copyOfRange(
+                tokenBytes,
+                VERSION_LENGTH,
+                VERSION_LENGTH + TIMESTAMP_LENGTH);
         final long timestamp = unpackLongBigendian(timestampBytes);
         if (ttl != null) {
             final long goodTill = timestamp + ttl.getSeconds();
@@ -181,7 +178,8 @@ public class Fernet implements Serializable {
             sha256_HMAC.init(key.getSigningKey());
             sha256_HMAC.update(tokenBytes, 0, tokenBytes.length - HMAC_LENGTH);
             final byte[] recomputedHmac = sha256_HMAC.doFinal();
-            // 5. Ensure the recomputed HMAC matches the HMAC field stored in the token, using a constant-time comparison function.
+            // 5. Ensure the recomputed HMAC matches the HMAC field stored in the token, using a constant-time
+            // comparison function.
             if (!MessageDigest.isEqual(recomputedHmac, hmac)) {
                 throw new FernetException("incorrect mac");
             }
@@ -189,19 +187,27 @@ public class Fernet implements Serializable {
             throw new FernetException(e);
         }
 
-        final byte[] ivBytes = Arrays.copyOfRange(tokenBytes, VERSION_LENGTH + TIMESTAMP_LENGTH, VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH);
+        final byte[] ivBytes = Arrays.copyOfRange(
+                tokenBytes,
+                VERSION_LENGTH + TIMESTAMP_LENGTH,
+                VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH);
         final IvParameterSpec iv = new IvParameterSpec(ivBytes);
 
-        // 6. Decrypt the ciphertext field using AES 128 in CBC mode with the recorded IV and user-supplied encryption-key.
+        // 6. Decrypt the ciphertext field using AES 128 in CBC mode with the recorded IV and user-supplied
+        // encryption-key.
         // 7. Unpad the decrypted plaintext, yielding the original message.
         byte[] message;
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
             cipher.init(DECRYPT_MODE, key.getEncryptionKey(), iv);
-            message = cipher.doFinal(tokenBytes, VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH, tokenBytes.length - (VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH) - HMAC_LENGTH);
+            message = cipher.doFinal(
+                    tokenBytes,
+                    VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH,
+                    tokenBytes.length - (VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH) - HMAC_LENGTH);
         } catch (BadPaddingException e) {
             throw new FernetException("payload padding error", e);
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException e) {
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
+                 | InvalidAlgorithmParameterException | IllegalBlockSizeException e) {
             throw new FernetException(e);
         }
 
@@ -256,7 +262,7 @@ public class Fernet implements Serializable {
      * <li>Encryption-key, 128 bits</li>
      * </ul>
      */
-    private static class Key implements Serializable {
+    private static final class Key implements Serializable {
         private static final String SIGNING_KEY_ALGORITHM = "HmacSHA256";
         private static final String ENCRYPTION_KEY_ALGORITHM = "AES";
 
@@ -286,28 +292,15 @@ public class Fernet implements Serializable {
         }
 
         private Key(byte[] secretBytes) {
-            this(Arrays.copyOfRange(secretBytes, 0, 16),
-                    Arrays.copyOfRange(secretBytes, 16, 32));
-        }
-
-        private Key(byte[] signingKeyBytes, byte[] encryptionKeyBytes) {
-            this(new SecretKeySpec(signingKeyBytes, SIGNING_KEY_ALGORITHM),
-                    new SecretKeySpec(encryptionKeyBytes, ENCRYPTION_KEY_ALGORITHM));
-        }
-
-        private Key(SecretKey signingKey, SecretKey encryptionKey) {
-            assert SIGNING_KEY_ALGORITHM.equals(signingKey.getAlgorithm());
-            assert signingKey.getEncoded().length == 16;
-            assert ENCRYPTION_KEY_ALGORITHM.equals(encryptionKey.getAlgorithm());
-            assert encryptionKey.getEncoded().length == 16;
-
-            this.signingKey = signingKey;
-            this.encryptionKey = encryptionKey;
+            byte[] signingKeyBytes = Arrays.copyOfRange(secretBytes, 0, 16);
+            byte[] encryptionKeyBytes = Arrays.copyOfRange(secretBytes, 16, 32);
+            this.signingKey = new SecretKeySpec(signingKeyBytes, SIGNING_KEY_ALGORITHM);
+            this.encryptionKey = new SecretKeySpec(encryptionKeyBytes, ENCRYPTION_KEY_ALGORITHM);
         }
 
         private static Key generate() {
             final byte[] bytes = new byte[32];
-            getSecureRandom().nextBytes(bytes);
+            SECURE_RANDOM.nextBytes(bytes);
             return new Key(bytes);
         }
 
@@ -330,7 +323,8 @@ public class Fernet implements Serializable {
                             final ByteArrayOutputStream bos = new ByteArrayOutputStream();
                             bos.write(signingKey.getEncoded());
                             bos.write(encryptionKey.getEncoded());
-                            this.base64urlEncodedSecret = localSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
+                            localSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
+                            this.base64urlEncodedSecret = localSecret;
                         } catch (IOException e) {
                             throw new FernetException(e);
                         }
