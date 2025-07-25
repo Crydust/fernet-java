@@ -1,20 +1,16 @@
 package be.crydust.fernet;
 
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import java.util.Arrays;
 import java.util.Base64;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThrows;
 
 public class SecretTest {
-
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
 
     private static final String Ax16_Bx16 = Helper.repeat("A", 16) + Helper.repeat("B", 16);
 
@@ -42,17 +38,15 @@ public class SecretTest {
     @Test
     public void fails_loudly_when_an_invalid_secret_is_provided() {
         final String secret = Base64.getUrlEncoder().encodeToString("bad".getBytes(UTF_8));
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("invalid secret");
-        new Fernet(secret);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(secret));
+        assertThat(e.getMessage(), is("invalid secret"));
     }
 
     @Test
     public void fails_loudly_when_an_invalid_secret_is_provided_with_illegal_base64_char() {
         final String secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa*=";
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("invalid secret");
-        new Fernet(secret);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(secret));
+        assertThat(e.getMessage(), is("invalid secret"));
     }
 
     private static void resolves_input(String input) {

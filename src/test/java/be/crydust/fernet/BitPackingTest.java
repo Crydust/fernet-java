@@ -5,11 +5,11 @@ import org.junit.Test;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class BitPackingTest {
-    private static Map<Long, byte[]> VALUE_TO_BYTES = new HashMap<>();
+    private static final Map<Long, byte[]> VALUE_TO_BYTES = new HashMap<>();
 
     static {
         VALUE_TO_BYTES.put(0x0000000000000000L, new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00});
@@ -21,16 +21,16 @@ public class BitPackingTest {
     }
 
     @Test
-    public void packLongBigendian() throws Exception {
+    public void packLongBigEndian() {
         for (Map.Entry<Long, byte[]> entry : VALUE_TO_BYTES.entrySet()) {
-            assertThat(Fernet.packLongBigendian(entry.getKey()), is(entry.getValue()));
+            assertThat(Fernet.packLongBigEndian(entry.getKey()), is(entry.getValue()));
         }
     }
 
     @Test
-    public void unpackLongBigendian() throws Exception {
+    public void unpackLongBigEndian() {
         for (Map.Entry<Long, byte[]> entry : VALUE_TO_BYTES.entrySet()) {
-            assertThat(Fernet.unpackLongBigendian(entry.getValue()), is(entry.getKey()));
+            assertThat(Fernet.unpackLongBigEndian(entry.getValue()), is(entry.getKey()));
         }
     }
 }

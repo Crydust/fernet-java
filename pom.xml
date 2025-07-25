@@ -10,7 +10,7 @@
     <licenses>
         <license>
             <name>MIT License</name>
-            <url>http://www.opensource.org/licenses/mit-license.php</url>
+            <url>https://opensource.org/license/mit</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -18,7 +18,7 @@
         <developer>
             <id>Crydust</id>
             <name>Kristof Neirynck</name>
-            <url>http://www.crydust.be</url>
+            <url>https://www.crydust.be</url>
         </developer>
     </developers>
     <scm>
@@ -28,8 +28,7 @@
         <url>https://github.com/Crydust/fernet-java</url>
     </scm>
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
@@ -76,11 +75,11 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <configuration>
-                            <configLocation>checkstyle-rules.xml</configLocation>
-                        </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <configLocation>${project.basedir}/checkstyle-rules.xml</configLocation>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

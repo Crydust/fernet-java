@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -76,7 +77,7 @@ public class Fernet implements Serializable {
     private static String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now, Key key) {
 
         // 1. Record the current time for the timestamp field.
-        final byte[] timestamp = packLongBigendian(now.toEpochSecond());
+        final byte[] timestamp = packLongBigEndian(now.toEpochSecond());
 
         // 2. Choose a unique IV.
         // see generateIV
@@ -160,7 +161,7 @@ public class Fernet implements Serializable {
                 tokenBytes,
                 VERSION_LENGTH,
                 VERSION_LENGTH + TIMESTAMP_LENGTH);
-        final long timestamp = unpackLongBigendian(timestampBytes);
+        final long timestamp = unpackLongBigEndian(timestampBytes);
         if (ttl != null) {
             final long goodTill = timestamp + ttl.getSeconds();
             if (goodTill <= nowEpoch) {
@@ -214,15 +215,20 @@ public class Fernet implements Serializable {
         return message;
     }
 
-    static byte[] packLongBigendian(long value) {
-        return ByteBuffer.allocate(8).putLong(value).array();
+    static byte[] packLongBigEndian(long value) {
+        return ByteBuffer.allocate(8)
+                .order(ByteOrder.BIG_ENDIAN)
+                .putLong(value)
+                .array();
     }
 
-    static long unpackLongBigendian(byte[] bytes) {
+    static long unpackLongBigEndian(byte[] bytes) {
         if (bytes.length != 8) {
             throw new IllegalArgumentException("Expected an array of 8 bytes, not " + bytes.length);
         }
-        return ByteBuffer.wrap(bytes).getLong();
+        return ByteBuffer.wrap(bytes)
+                .order(ByteOrder.BIG_ENDIAN)
+                .getLong();
     }
 
     public String encrypt(byte[] message) {

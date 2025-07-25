@@ -1,8 +1,6 @@
 package be.crydust.fernet;
 
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import java.util.Base64;
 
@@ -10,15 +8,13 @@ import static be.crydust.fernet.Helper.repeat;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.ZonedDateTime.now;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 public class TokenValidationTest {
     private final String SECRET = "odN/0Yu+Pwp3oIvvG8OiE5w4LsLrqfWYRb3knQtSyKI=";
-
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void is_invalid_with_a_bad_MAC_signature() {
@@ -27,24 +23,21 @@ public class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         System.arraycopy(bogus_hmac, 0, bytes, bytes.length - bogus_hmac.length, bogus_hmac.length);
         final String token_with_bogus_hmac = Base64.getUrlEncoder().encodeToString(bytes);
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("incorrect mac");
-        new Fernet(SECRET).decrypt(token_with_bogus_hmac);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_hmac));
+        assertThat(e.getMessage(), is("incorrect mac"));
     }
 
     @Test
     public void is_invalid_with_a_large_clock_skew() {
         final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), now().plusSeconds(61));
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("far-future TS (unacceptable clock skew)");
-        new Fernet(SECRET).decrypt(generated);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(generated));
+        assertThat(e.getMessage(), is("far-future TS (unacceptable clock skew)"));
     }
 
     @Test
     public void is_invalid_with_bad_base64() {
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("invalid base64");
-        new Fernet(SECRET).decrypt("bad*");
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt("bad*"));
+        assertThat(e.getMessage(), is("invalid base64"));
     }
 
     @Test
@@ -54,9 +47,8 @@ public class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         bytes[0] = bogus_version;
         final String token_with_bogus_version = Base64.getUrlEncoder().encodeToString(bytes);
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("Unknown version 0");
-        new Fernet(SECRET).decrypt(token_with_bogus_version);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_version));
+        assertThat(e.getMessage(), is("Unknown version 0"));
     }
 
     @Test
@@ -66,9 +58,8 @@ public class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         bytes[0] = bogus_version;
         final String token_with_bogus_version = Base64.getUrlEncoder().encodeToString(bytes);
-        thrown.expect(FernetException.class);
-        thrown.expectMessage("Unknown version 81");
-        new Fernet(SECRET).decrypt(token_with_bogus_version);
+        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_version));
+        assertThat(e.getMessage(), is("Unknown version 81"));
     }
 
     @Test
