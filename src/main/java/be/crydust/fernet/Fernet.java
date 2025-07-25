@@ -274,7 +274,7 @@ public class Fernet implements Serializable {
 
         private final SecretKey signingKey;
         private final SecretKey encryptionKey;
-        private volatile String base64urlEncodedSecret = null;
+        private final String base64urlEncodedSecret;
 
         private static Key valueOf(String s) {
             try {
@@ -298,10 +298,14 @@ public class Fernet implements Serializable {
         }
 
         private Key(byte[] secretBytes) {
+            if (secretBytes.length != 32) {
+                throw new IllegalArgumentException("Expected an array of 32 bytes, not " + secretBytes.length);
+            }
             byte[] signingKeyBytes = Arrays.copyOfRange(secretBytes, 0, 16);
             byte[] encryptionKeyBytes = Arrays.copyOfRange(secretBytes, 16, 32);
             this.signingKey = new SecretKeySpec(signingKeyBytes, SIGNING_KEY_ALGORITHM);
             this.encryptionKey = new SecretKeySpec(encryptionKeyBytes, ENCRYPTION_KEY_ALGORITHM);
+            this.base64urlEncodedSecret = Base64.getUrlEncoder().encodeToString(secretBytes);
         }
 
         private static Key generate() {
@@ -320,24 +324,7 @@ public class Fernet implements Serializable {
 
         @Override
         public String toString() {
-            String localSecret = this.base64urlEncodedSecret;
-            if (localSecret == null) {
-                synchronized (this) {
-                    localSecret = this.base64urlEncodedSecret;
-                    if (localSecret == null) {
-                        try {
-                            final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                            bos.write(signingKey.getEncoded());
-                            bos.write(encryptionKey.getEncoded());
-                            localSecret = Base64.getUrlEncoder().encodeToString(bos.toByteArray());
-                            this.base64urlEncodedSecret = localSecret;
-                        } catch (IOException e) {
-                            throw new FernetException(e);
-                        }
-                    }
-                }
-            }
-            return localSecret;
+            return this.base64urlEncodedSecret;
         }
     }
 }
