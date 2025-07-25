@@ -9,8 +9,8 @@ import java.util.stream.Stream;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.Duration.ofSeconds;
 import static java.time.ZonedDateTime.now;
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
 public class FernetTest {
 
@@ -18,7 +18,7 @@ public class FernetTest {
     private final String bad_secret = "badICDH6x3M7duQeM8dJEMK4Y5TkBIsYDw1lPy35RiY=";
 
     @Test
-    public void can_verify_tokens_it_generates() throws Exception {
+    public void can_verify_tokens_it_generates() {
         Stream.of("harold@heroku.com", "12345", "weird!@#$%^&*()chars", "more weird chars §§§§").forEach(plain -> {
             String token = new Fernet(secret).encrypt(plain.getBytes(UTF_8));
             String message = new String(new Fernet(secret).decrypt(token), UTF_8);
@@ -27,7 +27,7 @@ public class FernetTest {
     }
 
     @Test(expected = FernetException.class)
-    public void fails_with_a_bad_secret() throws Exception {
+    public void fails_with_a_bad_secret() {
         String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
         new Fernet(bad_secret).decrypt(token);
     }
