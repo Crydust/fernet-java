@@ -302,11 +302,8 @@ public class Fernet implements Serializable {
             if (secretBytes.length != 32) {
                 throw new IllegalArgumentException("Expected an array of 32 bytes, not " + secretBytes.length);
             }
-            byte[] signingKeyBytes = Arrays.copyOfRange(secretBytes, 0, 16);
-            byte[] encryptionKeyBytes = Arrays.copyOfRange(secretBytes, 16, 32);
-            this.signingKey = new SecretKeySpec(signingKeyBytes, SIGNING_KEY_ALGORITHM);
-            this.encryptionKey = new SecretKeySpec(encryptionKeyBytes, ENCRYPTION_KEY_ALGORITHM);
-            this.base64urlEncodedSecret = Base64.getUrlEncoder().encodeToString(secretBytes);
+            this.signingKey = new SecretKeySpec(secretBytes, 0, 16, SIGNING_KEY_ALGORITHM);
+            this.encryptionKey = new SecretKeySpec(secretBytes, 16, 16, ENCRYPTION_KEY_ALGORITHM);
         }
 
         private static Key generate() {
