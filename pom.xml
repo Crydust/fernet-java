@@ -55,11 +55,32 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.13</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>3.3.1</version>
                 <executions>
                     <execution>
+                        <id>jar</id>
                         <goals>
                             <goal>jar</goal>
                         </goals>
@@ -72,6 +93,7 @@
                 <version>3.6.0</version>
                 <executions>
                     <execution>
+                        <id>check</id>
                         <goals>
                             <goal>check</goal>
                         </goals>
@@ -87,6 +109,7 @@
                 <version>3.27.0</version>
                 <executions>
                     <execution>
+                        <id>check</id>
                         <goals>
                             <goal>check</goal>
                         </goals>
@@ -103,6 +126,7 @@
                 <version>4.9.3.0</version>
                 <executions>
                     <execution>
+                        <id>check</id>
                         <goals>
                             <goal>check</goal>
                         </goals>
