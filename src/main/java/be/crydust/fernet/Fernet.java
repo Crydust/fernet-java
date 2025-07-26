@@ -274,7 +274,7 @@ public class Fernet implements Serializable {
 
         private final SecretKey signingKey;
         private final SecretKey encryptionKey;
-        private final String base64urlEncodedSecret;
+        private transient volatile String base64urlEncodedSecret = null;
 
         private static Key valueOf(String s) {
             try {
@@ -324,7 +324,26 @@ public class Fernet implements Serializable {
 
         @Override
         public String toString() {
-            return this.base64urlEncodedSecret;
+            String localSecret = this.base64urlEncodedSecret;
+            if (localSecret == null) {
+                synchronized (this) {
+                    localSecret = this.base64urlEncodedSecret;
+                    if (localSecret == null) {
+                        localSecret = Base64.getUrlEncoder().encodeToString(toBytes());
+                        this.base64urlEncodedSecret = localSecret;
+                    }
+                }
+            }
+            return localSecret;
+        }
+
+        private byte[] toBytes() {
+            byte[] signingKeyBytes = signingKey.getEncoded();
+            byte[] encryptionKeyBytes = encryptionKey.getEncoded();
+            byte[] secretBytes = new byte[32];
+            System.arraycopy(signingKeyBytes, 0, secretBytes, 0, 16);
+            System.arraycopy(encryptionKeyBytes, 0, secretBytes, 16, 16);
+            return secretBytes;
         }
     }
 }
