@@ -3,14 +3,16 @@ package be.crydust.fernet;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.time.Instant;
 import java.util.Base64;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.Duration.ofSeconds;
-import static java.time.ZonedDateTime.now;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 public class FernetTest {
 
@@ -34,14 +36,14 @@ public class FernetTest {
 
     @Test(expected = FernetException.class)
     public void fails_if_the_token_is_too_old() {
-        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), now().minusSeconds(61));
+        final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), Instant.now().minusSeconds(61));
         new Fernet(secret).decrypt(token, ofSeconds(60L));
     }
 
     @Test
     public void can_ignore_TTL_enforcement() {
         final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
-        String message = new String(new Fernet(secret).decrypt(token, null, now().plusSeconds(9999)), UTF_8);
+        String message = new String(new Fernet(secret).decrypt(token, null, Instant.now().plusSeconds(9999)), UTF_8);
         assertThat(message, is("harold@heroku.com"));
     }
 

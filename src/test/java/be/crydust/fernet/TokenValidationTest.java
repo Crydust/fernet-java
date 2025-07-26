@@ -2,12 +2,12 @@ package be.crydust.fernet;
 
 import org.junit.Test;
 
+import java.time.Instant;
 import java.util.Base64;
 
 import static be.crydust.fernet.Helper.repeat;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.ZonedDateTime.now;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThrows;
@@ -29,7 +29,7 @@ public class TokenValidationTest {
 
     @Test
     public void is_invalid_with_a_large_clock_skew() {
-        final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), now().plusSeconds(61));
+        final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), Instant.now().plusSeconds(61));
         FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(generated));
         assertThat(e.getMessage(), is("far-future TS (unacceptable clock skew)"));
     }

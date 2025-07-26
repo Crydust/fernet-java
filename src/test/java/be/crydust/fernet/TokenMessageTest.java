@@ -2,8 +2,9 @@ package be.crydust.fernet;
 
 import org.junit.Test;
 
+import java.time.Instant;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.ZonedDateTime.now;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThrows;
@@ -13,7 +14,7 @@ public class TokenMessageTest {
 
     @Test
     public void refuses_to_decrypt_if_invalid() {
-        final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), now().plusSeconds(61));
+        final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), Instant.now().plusSeconds(61));
         FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(generated));
         assertThat(e.getMessage(), is("far-future TS (unacceptable clock skew)"));
     }

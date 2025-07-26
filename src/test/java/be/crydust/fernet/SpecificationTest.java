@@ -9,6 +9,7 @@ import javax.crypto.spec.IvParameterSpec;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -24,7 +25,7 @@ public class SpecificationTest {
             final JSONObject object = new JSONArray(new JSONTokener(in)).getJSONObject(0);
             final String expectedToken = object.getString("token");
             final String nowString = object.getString("now");
-            final ZonedDateTime now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME);
+            final Instant now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME).toInstant();
             final JSONArray ivIntArray = object.getJSONArray("iv");
             final int ivLength = ivIntArray.length();
             if (ivLength != 16) {
@@ -49,7 +50,7 @@ public class SpecificationTest {
             final JSONObject object = new JSONArray(new JSONTokener(in)).getJSONObject(0);
             final String actualToken = object.getString("token");
             final String nowString = object.getString("now");
-            final ZonedDateTime now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME);
+            final Instant now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME).toInstant();
             final long ttl = object.getLong("ttl_sec");
             final String expectedMessage = object.getString("src");
             final String secretString = object.getString("secret");
@@ -70,7 +71,7 @@ public class SpecificationTest {
                         ? "payload padding error" : desc;
                 final String actualToken = object.getString("token");
                 final String nowString = object.getString("now");
-                final ZonedDateTime now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME);
+                final Instant now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME).toInstant();
                 final long ttl = object.getLong("ttl_sec");
                 final String secretString = object.getString("secret");
                 FernetException e = assertThrows(FernetException.class, () -> new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now));

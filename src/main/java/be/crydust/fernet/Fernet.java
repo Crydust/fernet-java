@@ -19,7 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -74,10 +74,10 @@ public final class Fernet implements Serializable {
         return new IvParameterSpec(ivBytes);
     }
 
-    private static String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now, Key key) {
+    private static String encrypt(byte[] message, IvParameterSpec iv, Instant now, Key key) {
 
         // 1. Record the current time for the timestamp field.
-        final byte[] timestamp = packLongBigEndian(now.toEpochSecond());
+        final byte[] timestamp = packLongBigEndian(now.getEpochSecond());
 
         // 2. Choose a unique IV.
         // see generateIV
@@ -127,7 +127,7 @@ public final class Fernet implements Serializable {
         return Base64.getUrlEncoder().encodeToString(bos.toByteArray());
     }
 
-    private static byte[] decrypt(String base64urlEncodedToken, Duration ttl, ZonedDateTime now, Key key) {
+    private static byte[] decrypt(String base64urlEncodedToken, Duration ttl, Instant now, Key key) {
         if (ttl != null && ttl.isNegative()) {
             throw new IllegalArgumentException("time-to-live must be positive");
         }
@@ -156,7 +156,7 @@ public final class Fernet implements Serializable {
 
         // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp
         // is not too far in the past.
-        final long nowEpoch = now.toEpochSecond();
+        final long nowEpoch = now.getEpochSecond();
         final byte[] timestampBytes = Arrays.copyOfRange(
                 tokenBytes,
                 VERSION_LENGTH,
@@ -232,26 +232,26 @@ public final class Fernet implements Serializable {
     }
 
     public String encrypt(byte[] message) {
-        return this.encrypt(message, generateIV(), ZonedDateTime.now());
+        return this.encrypt(message, generateIV(), Instant.now());
     }
 
-    public String encrypt(byte[] message, ZonedDateTime now) {
+    public String encrypt(byte[] message, Instant now) {
         return this.encrypt(message, generateIV(), now);
     }
 
-    String encrypt(byte[] message, IvParameterSpec iv, ZonedDateTime now) {
+    String encrypt(byte[] message, IvParameterSpec iv, Instant now) {
         return encrypt(message, iv, now, this.key);
     }
 
     public byte[] decrypt(String token) {
-        return this.decrypt(token, null, ZonedDateTime.now());
+        return this.decrypt(token, null, Instant.now());
     }
 
     public byte[] decrypt(String token, Duration ttl) {
-        return this.decrypt(token, ttl, ZonedDateTime.now());
+        return this.decrypt(token, ttl, Instant.now());
     }
 
-    byte[] decrypt(String token, Duration ttl, ZonedDateTime now) {
+    byte[] decrypt(String token, Duration ttl, Instant now) {
         return decrypt(token, ttl, now, this.key);
     }
 
