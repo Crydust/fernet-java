@@ -27,7 +27,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import static javax.crypto.Cipher.DECRYPT_MODE;
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
-public class Fernet implements Serializable {
+public final class Fernet implements Serializable {
     private static final long serialVersionUID = -9057111545600036176L;
     private static final byte VERSION = (byte) 0x80;
     private static final int HMAC_LENGTH = 32;
@@ -197,7 +197,7 @@ public class Fernet implements Serializable {
         // 6. Decrypt the ciphertext field using AES 128 in CBC mode with the recorded IV and user-supplied
         // encryption-key.
         // 7. Unpad the decrypted plaintext, yielding the original message.
-        byte[] message;
+        final byte[] message;
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
             cipher.init(DECRYPT_MODE, key.getEncryptionKey(), iv);
@@ -336,9 +336,9 @@ public class Fernet implements Serializable {
         }
 
         private byte[] toBytes() {
-            byte[] signingKeyBytes = signingKey.getEncoded();
-            byte[] encryptionKeyBytes = encryptionKey.getEncoded();
-            byte[] secretBytes = new byte[32];
+            final byte[] signingKeyBytes = signingKey.getEncoded();
+            final byte[] encryptionKeyBytes = encryptionKey.getEncoded();
+            final byte[] secretBytes = new byte[32];
             System.arraycopy(signingKeyBytes, 0, secretBytes, 0, 16);
             System.arraycopy(encryptionKeyBytes, 0, secretBytes, 16, 16);
             return secretBytes;
