@@ -28,7 +28,7 @@ import static javax.crypto.Cipher.DECRYPT_MODE;
 import static javax.crypto.Cipher.ENCRYPT_MODE;
 
 public class Fernet implements Serializable {
-
+    private static final long serialVersionUID = -9057111545600036176L;
     private static final byte VERSION = (byte) 0x80;
     private static final int HMAC_LENGTH = 32;
     private static final int VERSION_LENGTH = 1;
@@ -269,6 +269,7 @@ public class Fernet implements Serializable {
      * </ul>
      */
     private static final class Key implements Serializable {
+        private static final long serialVersionUID = -5265692531084945591L;
         private static final String SIGNING_KEY_ALGORITHM = "HmacSHA256";
         private static final String ENCRYPTION_KEY_ALGORITHM = "AES";
 
