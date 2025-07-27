@@ -193,10 +193,9 @@ public final class Fernet implements Serializable {
         try {
             final Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
             cipher.init(DECRYPT_MODE, key.getEncryptionKey(), iv);
-            message = cipher.doFinal(
-                    tokenBytes,
-                    VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH,
-                    tokenBytes.length - (VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH) - HMAC_LENGTH);
+            final int offset = VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH;
+            final int length = tokenBytes.length - offset - HMAC_LENGTH;
+            message = cipher.doFinal(tokenBytes, offset, length);
         } catch (BadPaddingException e) {
             throw new FernetException("payload padding error", e);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
