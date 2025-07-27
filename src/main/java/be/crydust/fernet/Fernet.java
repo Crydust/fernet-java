@@ -109,9 +109,9 @@ public final class Fernet implements Serializable {
         final byte[] hmac;
         try {
             // 4. Compute the HMAC field as described above using the user-supplied signing-key.
-            final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
-            sha256_HMAC.init(key.getSigningKey());
-            hmac = sha256_HMAC.doFinal(bos.toByteArray());
+            final Mac sha256HMAC = Mac.getInstance(HMAC_ALGORITHM);
+            sha256HMAC.init(key.getSigningKey());
+            hmac = sha256HMAC.doFinal(bos.toByteArray());
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new FernetException(e);
         }
@@ -171,10 +171,10 @@ public final class Fernet implements Serializable {
         try {
             final byte[] hmac = Arrays.copyOfRange(tokenBytes, tokenBytes.length - HMAC_LENGTH, tokenBytes.length);
             // 4. Recompute the HMAC from the other fields and the user-supplied signing-key.
-            final Mac sha256_HMAC = Mac.getInstance(HMAC_ALGORITHM);
-            sha256_HMAC.init(key.getSigningKey());
-            sha256_HMAC.update(tokenBytes, 0, tokenBytes.length - HMAC_LENGTH);
-            final byte[] recomputedHmac = sha256_HMAC.doFinal();
+            final Mac sha256HMAC = Mac.getInstance(HMAC_ALGORITHM);
+            sha256HMAC.init(key.getSigningKey());
+            sha256HMAC.update(tokenBytes, 0, tokenBytes.length - HMAC_LENGTH);
+            final byte[] recomputedHmac = sha256HMAC.doFinal();
             // 5. Ensure the recomputed HMAC matches the HMAC field stored in the token, using a constant-time
             // comparison function.
             if (!MessageDigest.isEqual(recomputedHmac, hmac)) {
