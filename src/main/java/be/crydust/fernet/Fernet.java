@@ -157,11 +157,7 @@ public final class Fernet implements Serializable {
         // 3. If the user has specified a maximum age (or "time-to-live") for the token, ensure the recorded timestamp
         // is not too far in the past.
         final long nowEpoch = now.getEpochSecond();
-        final byte[] timestampBytes = Arrays.copyOfRange(
-                tokenBytes,
-                VERSION_LENGTH,
-                VERSION_LENGTH + TIMESTAMP_LENGTH);
-        final long timestamp = unpackLongBigEndian(timestampBytes);
+        final long timestamp = unpackLongBigEndian(tokenBytes, VERSION_LENGTH, TIMESTAMP_LENGTH);
         if (ttl != null) {
             final long goodTill = timestamp + ttl.getSeconds();
             if (goodTill <= nowEpoch) {
@@ -188,11 +184,7 @@ public final class Fernet implements Serializable {
             throw new FernetException(e);
         }
 
-        final byte[] ivBytes = Arrays.copyOfRange(
-                tokenBytes,
-                VERSION_LENGTH + TIMESTAMP_LENGTH,
-                VERSION_LENGTH + TIMESTAMP_LENGTH + IV_LENGTH);
-        final IvParameterSpec iv = new IvParameterSpec(ivBytes);
+        final IvParameterSpec iv = new IvParameterSpec(tokenBytes, VERSION_LENGTH + TIMESTAMP_LENGTH, IV_LENGTH);
 
         // 6. Decrypt the ciphertext field using AES 128 in CBC mode with the recorded IV and user-supplied
         // encryption-key.
@@ -222,11 +214,11 @@ public final class Fernet implements Serializable {
                 .array();
     }
 
-    static long unpackLongBigEndian(byte[] bytes) {
-        if (bytes.length != 8) {
-            throw new IllegalArgumentException("Expected an array of 8 bytes, not " + bytes.length);
+    static long unpackLongBigEndian(byte[] bytes, int offset, int length) {
+        if (length != 8) {
+            throw new IllegalArgumentException("Expected an array of 8 bytes, not " + length);
         }
-        return ByteBuffer.wrap(bytes)
+        return ByteBuffer.wrap(bytes, offset, length)
                 .order(ByteOrder.BIG_ENDIAN)
                 .getLong();
     }

@@ -30,7 +30,7 @@ public class BitPackingTest {
     @Test
     public void unpackLongBigEndian() {
         for (Map.Entry<Long, byte[]> entry : VALUE_TO_BYTES.entrySet()) {
-            assertThat(Fernet.unpackLongBigEndian(entry.getValue()), is(entry.getKey()));
+            assertThat(Fernet.unpackLongBigEndian(entry.getValue(), 0, 8), is(entry.getKey()));
         }
     }
 }
