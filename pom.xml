@@ -75,6 +75,11 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <formats>
+                        <format>XML</format>
+                    </formats>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
