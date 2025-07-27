@@ -12,27 +12,27 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SecretTest {
 
-    private static final String Ax16_Bx16 = Helper.repeat("A", 16) + Helper.repeat("B", 16);
+    private static final String AX16_BX16 = Helper.repeat("A", 16) + Helper.repeat("B", 16);
 
     @Test
     void can_resolve_a_URL_safe_base64_encoded_32_byte_string() {
-        final String encoded = Base64.getUrlEncoder().encodeToString(Ax16_Bx16.getBytes(UTF_8));
+        final String encoded = Base64.getUrlEncoder().encodeToString(AX16_BX16.getBytes(UTF_8));
         resolves_input(encoded);
     }
 
     @Test
     void can_resolve_a_base64_encoded_32_byte_string() {
-        resolves_input(Base64.getEncoder().encodeToString(Ax16_Bx16.getBytes(UTF_8)));
+        resolves_input(Base64.getEncoder().encodeToString(AX16_BX16.getBytes(UTF_8)));
     }
 
     @Test
     void can_resolve_a_base64_encoded_32_byte_string_without_padding() {
-        resolves_input(Base64.getEncoder().withoutPadding().encodeToString(Ax16_Bx16.getBytes(UTF_8)));
+        resolves_input(Base64.getEncoder().withoutPadding().encodeToString(AX16_BX16.getBytes(UTF_8)));
     }
 
     @Test
     void can_resolve_a_32_byte_string_without_encoding() {
-        resolves_input(Ax16_Bx16);
+        resolves_input(AX16_BX16);
     }
 
     @Test
