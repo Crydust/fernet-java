@@ -6,8 +6,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class BitPackingTest {
 
@@ -25,12 +24,12 @@ class BitPackingTest {
     @ParameterizedTest
     @MethodSource("data")
     void packLongBigEndian(long input, byte[] expected) {
-        assertThat(Fernet.packLongBigEndian(input), is(expected));
+        assertThat(Fernet.packLongBigEndian(input)).isEqualTo(expected);
     }
 
     @ParameterizedTest
     @MethodSource("data")
     void unpackLongBigEndian(long expected, byte[] input) {
-        assertThat(Fernet.unpackLongBigEndian(input, 0, 8), is(expected));
+        assertThat(Fernet.unpackLongBigEndian(input, 0, 8)).isEqualTo(expected);
     }
 }

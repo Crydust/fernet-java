@@ -13,9 +13,8 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 class SpecificationTest {
 
@@ -40,7 +39,7 @@ class SpecificationTest {
             final byte[] message = srcString.getBytes(StandardCharsets.UTF_8);
             final String secretString = object.getString("secret");
             final String actualToken = new Fernet(secretString).encrypt(message, iv, now);
-            assertThat(actualToken, is(expectedToken));
+            assertThat(actualToken).isEqualTo(expectedToken);
         }
     }
 
@@ -56,7 +55,7 @@ class SpecificationTest {
             final String secretString = object.getString("secret");
             final byte[] decryptedBytes = new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now);
             final String actualMessage = new String(decryptedBytes, StandardCharsets.UTF_8);
-            assertThat(actualMessage, is(expectedMessage));
+            assertThat(actualMessage).isEqualTo(expectedMessage);
         }
     }
 
@@ -74,8 +73,9 @@ class SpecificationTest {
                 final Instant now = ZonedDateTime.parse(nowString, DateTimeFormatter.ISO_ZONED_DATE_TIME).toInstant();
                 final long ttl = object.getLong("ttl_sec");
                 final String secretString = object.getString("secret");
-                FernetException e = assertThrows(FernetException.class, () -> new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now));
-                assertThat(e.getMessage(), is(expectedMessage));
+                assertThatExceptionOfType(FernetException.class)
+                        .isThrownBy(() -> new Fernet(secretString).decrypt(actualToken, Duration.ofSeconds(ttl), now))
+                        .withMessage(expectedMessage);
             }
         }
     }

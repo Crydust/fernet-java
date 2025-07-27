@@ -8,9 +8,7 @@ import java.util.Base64;
 import static be.crydust.fernet.Helper.repeat;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 class TokenValidationTest {
     private static final String SECRET = "odN/0Yu+Pwp3oIvvG8OiE5w4LsLrqfWYRb3knQtSyKI=";
@@ -22,21 +20,24 @@ class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         System.arraycopy(bogusHmac, 0, bytes, bytes.length - bogusHmac.length, bogusHmac.length);
         final String token_with_bogus_hmac = Base64.getUrlEncoder().encodeToString(bytes);
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_hmac));
-        assertThat(e.getMessage(), is("incorrect mac"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(SECRET).decrypt(token_with_bogus_hmac))
+                .withMessage("incorrect mac");
     }
 
     @Test
     void is_invalid_with_a_large_clock_skew() {
         final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), Instant.now().plusSeconds(61));
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(generated));
-        assertThat(e.getMessage(), is("far-future TS (unacceptable clock skew)"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(SECRET).decrypt(generated))
+                .withMessage("far-future TS (unacceptable clock skew)");
     }
 
     @Test
     void is_invalid_with_bad_base64() {
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt("bad*"));
-        assertThat(e.getMessage(), is("invalid base64"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(SECRET).decrypt("bad*"))
+                .withMessage("invalid base64");
     }
 
     @Test
@@ -46,8 +47,9 @@ class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         bytes[0] = bogusVersion;
         final String token_with_bogus_version = Base64.getUrlEncoder().encodeToString(bytes);
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_version));
-        assertThat(e.getMessage(), is("Unknown version 0"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(SECRET).decrypt(token_with_bogus_version))
+                .withMessage("Unknown version 0");
     }
 
     @Test
@@ -57,8 +59,9 @@ class TokenValidationTest {
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
         bytes[0] = bogusVersion;
         final String token_with_bogus_version = Base64.getUrlEncoder().encodeToString(bytes);
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(token_with_bogus_version));
-        assertThat(e.getMessage(), is("Unknown version 81"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(SECRET).decrypt(token_with_bogus_version))
+                .withMessage("Unknown version 81");
     }
 
     @Test
@@ -73,8 +76,9 @@ class TokenValidationTest {
                 token.replaceFirst("(.)$", "\\\\")
         };
         for (String invalidString : invalidStrings) {
-            FernetException ex = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(invalidString));
-            assertThat(ex.getMessage(), is("invalid base64"));
+            assertThatExceptionOfType(FernetException.class)
+                    .isThrownBy(() -> new Fernet(SECRET).decrypt(invalidString))
+                    .withMessage("invalid base64");
         }
     }
 }

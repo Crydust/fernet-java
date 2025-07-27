@@ -6,9 +6,8 @@ import java.util.Arrays;
 import java.util.Base64;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 class SecretTest {
 
@@ -38,21 +37,23 @@ class SecretTest {
     @Test
     void fails_loudly_when_an_invalid_secret_is_provided() {
         final String secret = Base64.getUrlEncoder().encodeToString("bad".getBytes(UTF_8));
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(secret));
-        assertThat(e.getMessage(), is("invalid secret"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(secret))
+                .withMessage("invalid secret");
     }
 
     @Test
     void fails_loudly_when_an_invalid_secret_is_provided_with_illegal_base64_char() {
         final String secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa*=";
-        FernetException e = assertThrows(FernetException.class, () -> new Fernet(secret));
-        assertThat(e.getMessage(), is("invalid secret"));
+        assertThatExceptionOfType(FernetException.class)
+                .isThrownBy(() -> new Fernet(secret))
+                .withMessage("invalid secret");
     }
 
     private static void resolves_input(String input) {
         final byte[] keyBytes = Base64.getUrlDecoder().decode(new Fernet(input).toString());
-        assertThat(new String(Arrays.copyOfRange(keyBytes, 0, 16), UTF_8), is(Helper.repeat("A", 16)));
-        assertThat(new String(Arrays.copyOfRange(keyBytes, 16, 32), UTF_8), is(Helper.repeat("B", 16)));
+        assertThat(new String(Arrays.copyOfRange(keyBytes, 0, 16), UTF_8)).isEqualTo(Helper.repeat("A", 16));
+        assertThat(new String(Arrays.copyOfRange(keyBytes, 16, 32), UTF_8)).isEqualTo(Helper.repeat("B", 16));
     }
 
 }

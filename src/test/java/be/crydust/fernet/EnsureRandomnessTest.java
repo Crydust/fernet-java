@@ -6,20 +6,18 @@ import java.util.Arrays;
 import java.util.Base64;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class EnsureRandomnessTest {
 
     @Test
     void key_is_not_all_zeroes() {
         final byte[] keyBytes = Base64.getUrlDecoder().decode(new Fernet().toString());
-        assertThat(keyBytes, is(not(new byte[]{
+        assertThat(keyBytes).isNotEqualTo(new byte[]{
                 (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
                 (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
                 (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
-                (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0})));
+                (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0});
     }
 
     @Test
@@ -27,9 +25,9 @@ class EnsureRandomnessTest {
         final String token = new Fernet().encrypt(new byte[0]);
         final byte[] tokenBytes = Base64.getUrlDecoder().decode(token);
         final byte[] ivBytes = Arrays.copyOfRange(tokenBytes, 1 + 8, 1 + 8 + 16);
-        assertThat(ivBytes, is(not(new byte[]{
+        assertThat(ivBytes).isNotEqualTo(new byte[]{
                 (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
-                (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0})));
+                (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0});
     }
 
     @Test
@@ -37,7 +35,7 @@ class EnsureRandomnessTest {
         final Fernet original = new Fernet();
         final Fernet copy = new Fernet(original.toString());
         final String encrypted = original.encrypt("hello".getBytes(UTF_8));
-        assertThat(new String(copy.decrypt(encrypted), UTF_8), is("hello"));
+        assertThat(new String(copy.decrypt(encrypted), UTF_8)).isEqualTo("hello");
     }
 
 }
