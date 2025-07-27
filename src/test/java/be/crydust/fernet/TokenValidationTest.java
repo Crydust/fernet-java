@@ -11,13 +11,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
-public class TokenValidationTest {
-    private final String SECRET = "odN/0Yu+Pwp3oIvvG8OiE5w4LsLrqfWYRb3knQtSyKI=";
+class TokenValidationTest {
+    private static final String SECRET = "odN/0Yu+Pwp3oIvvG8OiE5w4LsLrqfWYRb3knQtSyKI=";
 
     @Test
-    public void is_invalid_with_a_bad_MAC_signature() {
+    void is_invalid_with_a_bad_MAC_signature() {
         String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8));
         byte[] bogus_hmac = repeat("1", 32).getBytes(US_ASCII);
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
@@ -28,20 +27,20 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void is_invalid_with_a_large_clock_skew() {
+    void is_invalid_with_a_large_clock_skew() {
         final String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8), Instant.now().plusSeconds(61));
         FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(generated));
         assertThat(e.getMessage(), is("far-future TS (unacceptable clock skew)"));
     }
 
     @Test
-    public void is_invalid_with_bad_base64() {
+    void is_invalid_with_bad_base64() {
         FernetException e = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt("bad*"));
         assertThat(e.getMessage(), is("invalid base64"));
     }
 
     @Test
-    public void is_invalid_with_an_unknown_token_version_00() {
+    void is_invalid_with_an_unknown_token_version_00() {
         String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8));
         byte bogus_version = (byte) 0x00;
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
@@ -52,7 +51,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void is_invalid_with_an_unknown_token_version_81() {
+    void is_invalid_with_an_unknown_token_version_81() {
         String generated = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8));
         byte bogus_version = (byte) 0x81;
         final byte[] bytes = Base64.getUrlDecoder().decode(generated);
@@ -63,7 +62,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void is_invalid_with_bad_base64_encodings() {
+    void is_invalid_with_bad_base64_encodings() {
         String token = new Fernet(SECRET).encrypt("hello".getBytes(UTF_8));
         String[] invalid_strings = {
                 "\n" + token,
@@ -74,12 +73,8 @@ public class TokenValidationTest {
                 token.replaceFirst("(.)$", "\\\\")
         };
         for (String invalid_string : invalid_strings) {
-            try {
-                new Fernet(SECRET).decrypt(invalid_string);
-                fail("no exception was thrown");
-            } catch (FernetException ex) {
-                assertThat(ex.getMessage(), is("invalid base64"));
-            }
+            FernetException ex = assertThrows(FernetException.class, () -> new Fernet(SECRET).decrypt(invalid_string));
+            assertThat(ex.getMessage(), is("invalid base64"));
         }
     }
 }

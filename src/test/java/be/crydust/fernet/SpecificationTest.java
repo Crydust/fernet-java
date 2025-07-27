@@ -17,10 +17,10 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class SpecificationTest {
+class SpecificationTest {
 
     @Test
-    public void generate() throws Exception {
+    void generate() throws Exception {
         try (final InputStream in = SpecificationTest.class.getResourceAsStream("generate.json")) {
             final JSONObject object = new JSONArray(new JSONTokener(in)).getJSONObject(0);
             final String expectedToken = object.getString("token");
@@ -45,7 +45,7 @@ public class SpecificationTest {
     }
 
     @Test
-    public void verify() throws Exception {
+    void verify() throws Exception {
         try (final InputStream in = SpecificationTest.class.getResourceAsStream("verify.json")) {
             final JSONObject object = new JSONArray(new JSONTokener(in)).getJSONObject(0);
             final String actualToken = object.getString("token");
@@ -61,7 +61,7 @@ public class SpecificationTest {
     }
 
     @Test
-    public void invalid() throws Exception {
+    void invalid() throws Exception {
         try (final InputStream in = SpecificationTest.class.getResourceAsStream("invalid.json")) {
             final JSONArray array = new JSONArray(new JSONTokener(in));
             for (int i = 0; i < array.length(); i++) {

@@ -10,10 +10,10 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 
-public class EnsureRandomnessTest {
+class EnsureRandomnessTest {
 
     @Test
-    public void key_is_not_all_zeroes() {
+    void key_is_not_all_zeroes() {
         final byte[] keyBytes = Base64.getUrlDecoder().decode(new Fernet().toString());
         assertThat(keyBytes, is(not(new byte[]{
                 (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
@@ -23,7 +23,7 @@ public class EnsureRandomnessTest {
     }
 
     @Test
-    public void iv_is_not_all_zeroes() {
+    void iv_is_not_all_zeroes() {
         final String token = new Fernet().encrypt(new byte[0]);
         final byte[] tokenBytes = Base64.getUrlDecoder().decode(token);
         final byte[] ivBytes = Arrays.copyOfRange(tokenBytes, 1 + 8, 1 + 8 + 16);
@@ -33,7 +33,7 @@ public class EnsureRandomnessTest {
     }
 
     @Test
-    public void is_fully_serialized_by_toString() {
+    void is_fully_serialized_by_toString() {
         final Fernet original = new Fernet();
         final Fernet copy = new Fernet(original.toString());
         final String encrypted = original.encrypt("hello".getBytes(UTF_8));
