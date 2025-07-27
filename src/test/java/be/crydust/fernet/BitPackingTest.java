@@ -1,12 +1,12 @@
 package be.crydust.fernet;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 public class BitPackingTest {
     private static final Map<Long, byte[]> VALUE_TO_BYTES = new HashMap<>();

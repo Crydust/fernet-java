@@ -3,7 +3,7 @@ package be.crydust.fernet;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import javax.crypto.spec.IvParameterSpec;
 import java.io.InputStream;
@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class SpecificationTest {
 

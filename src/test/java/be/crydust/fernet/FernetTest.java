@@ -1,7 +1,7 @@
 package be.crydust.fernet;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Base64;
@@ -13,6 +13,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class FernetTest {
 
@@ -28,16 +29,16 @@ public class FernetTest {
         });
     }
 
-    @Test(expected = FernetException.class)
+    @Test
     public void fails_with_a_bad_secret() {
         String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8));
-        new Fernet(bad_secret).decrypt(token);
+        assertThrows(FernetException.class, () -> new Fernet(bad_secret).decrypt(token));
     }
 
-    @Test(expected = FernetException.class)
+    @Test
     public void fails_if_the_token_is_too_old() {
         final String token = new Fernet(secret).encrypt("harold@heroku.com".getBytes(UTF_8), Instant.now().minusSeconds(61));
-        new Fernet(secret).decrypt(token, ofSeconds(60L));
+        assertThrows(FernetException.class, () ->new Fernet(secret).decrypt(token, ofSeconds(60L)));
     }
 
     @Test
@@ -48,7 +49,7 @@ public class FernetTest {
     }
 
     @Test
-    @Ignore("there is no global config")
+    @Disabled("there is no global config")
     public void can_ignore_TTL_enforcement_via_global_config() {
     }
 
@@ -59,7 +60,7 @@ public class FernetTest {
     }
 
     @Test
-    @Ignore("not implemented")
+    @Disabled("not implemented")
     public void allows_overriding_enforce_ttl_on_a_verifier() {
     }
 
